@@ -41,7 +41,13 @@ namespace Kraken.WebSockets.Authentication
         /// Requests the websocket token from the configured REST API endpoint
         /// </summary>
         /// <returns></returns>
-        public async Task<AuthToken> GetWebsocketToken()
+        public Task<AuthToken> GetWebsocketToken() => InvokePrivateApi<AuthToken>("GetWebSocketsToken");
+
+        /// <summary>
+        /// Perform request to the private REST API endpoint
+        /// </summary>
+        /// <returns></returns>
+        public async Task<T> InvokePrivateApi<T>(string apiName, params (string key, string value)[] parameters)
         {
             var formContent = new Dictionary<string, string>();
 
@@ -49,7 +55,11 @@ namespace Kraken.WebSockets.Authentication
             var nonce = DateTime.Now.Ticks;
             formContent.Add("nonce", nonce.ToString());
 
-            var path = $"/{version}/private/GetWebSocketsToken";
+            if (parameters != null)
+                foreach (var p in parameters)
+                    formContent[p.key] = p.value;
+
+            var path = $"/{version}/private/{apiName}";
             var address = $"{uri}{path}";
 
             var content = new FormUrlEncodedContent(formContent);
@@ -71,7 +81,7 @@ namespace Kraken.WebSockets.Authentication
                     using (var jsonReader = new JsonTextReader(new StreamReader(stream)))
                     {
                         var jObject = new JsonSerializer().Deserialize<JObject>(jsonReader);
-                        return jObject.Property("result").Value.ToObject<AuthToken>();
+                        return jObject.Property("result").Value.ToObject<T>();
                     }
                 }
             }
