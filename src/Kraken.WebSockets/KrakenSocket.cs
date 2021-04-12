@@ -67,9 +67,7 @@ namespace Kraken.WebSockets
 
                 await webSocket.ConnectAsync(new Uri(uri), cancellationToken);
                 InvokeConnected();
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                StartListening();
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+                _ = Task.Run(() => StartListening());
             }
             catch (Exception ex)
             {
@@ -168,6 +166,14 @@ namespace Kraken.WebSockets
             {
                 logger?.LogInformation("Closing WebSocket");
                 webSocket.Dispose();
+            }
+
+            //reconnect
+            while (true)
+            {
+                await Task.Delay(1 * 1000);
+                try { await ConnectAsync(); return; } catch { }
+                await Task.Delay(20 * 1000);
             }
         }
 
