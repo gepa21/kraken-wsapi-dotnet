@@ -21,7 +21,7 @@ namespace Kraken.WebSockets
         private static readonly Encoding DEFAULT_ENCODING = Encoding.UTF8;
 
 
-        private readonly IWebSocket webSocket;
+        private IWebSocket webSocket;
         private readonly string uri;
         private readonly IKrakenMessageSerializer serializer;
 
@@ -171,7 +171,9 @@ namespace Kraken.WebSockets
             //reconnect
             while (true)
             {
+                logger?.LogInformation("Attempting reconnect..");
                 await Task.Delay(1 * 1000);
+                webSocket = new DefaultWebSocket(new ClientWebSocket());
                 try { await ConnectAsync(); return; } catch { }
                 await Task.Delay(20 * 1000);
             }
