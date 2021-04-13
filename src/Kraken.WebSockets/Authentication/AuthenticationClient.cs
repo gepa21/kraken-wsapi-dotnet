@@ -52,7 +52,7 @@ namespace Kraken.WebSockets.Authentication
             var formContent = new Dictionary<string, string>();
 
             // generate a 64 bit nonce using a timestamp at tick resolution
-            var nonce = DateTime.Now.Ticks;
+            var nonce = DateTime.UtcNow.Ticks;
             formContent.Add("nonce", nonce.ToString());
 
             if (parameters != null)
