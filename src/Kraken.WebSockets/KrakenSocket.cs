@@ -31,6 +31,11 @@ namespace Kraken.WebSockets
         public event EventHandler Connected;
 
         /// <summary>
+        /// Occurs when re-connected.
+        /// </summary>
+        public event EventHandler ReConnected;
+
+        /// <summary>
         /// Occurs when data received.
         /// </summary>
         public event EventHandler<KrakenMessageEventArgs> DataReceived;
@@ -159,8 +164,6 @@ namespace Kraken.WebSockets
             catch (Exception ex)
             {
                 logger?.LogError(ex, "Error while listening or reading new messages from WebSocket");
-                // TODO: Disconnected-Event
-                throw;
             }
             finally
             {
@@ -174,8 +177,20 @@ namespace Kraken.WebSockets
                 logger?.LogInformation("Attempting reconnect..");
                 await Task.Delay(1 * 1000);
                 webSocket = new DefaultWebSocket(new ClientWebSocket());
-                try { await ConnectAsync(); return; } catch { }
-                await Task.Delay(20 * 1000);
+                try
+                {
+                    await ConnectAsync();
+                    var ev = ReConnected;
+                    if (ev != null)
+                        InvokeAllHandlers(ev.GetInvocationList(), null);
+                    return;
+                }
+                catch
+                {
+                    try { webSocket.Dispose(); } catch { }
+                    await Task.Delay(20 * 1000);
+                }
+                await Task.Delay(10 * 1000);
             }
         }
 

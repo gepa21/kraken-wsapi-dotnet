@@ -17,7 +17,7 @@ namespace Kraken.WebSockets
     {
         private static readonly ILogger<KrakenApiClient> logger = LogManager.CreateLogger<KrakenApiClient>();
 
-        private readonly IKrakenSocket socket;
+        public readonly IKrakenSocket Socket;
         private readonly IKrakenMessageSerializer serializer;
 
         private bool disposedValue = false;
@@ -112,12 +112,13 @@ namespace Kraken.WebSockets
         /// </exception>
         internal KrakenApiClient(IKrakenSocket socket, IKrakenMessageSerializer serializer)
         {
-            this.socket = socket ?? throw new ArgumentNullException(nameof(socket));
+            this.Socket = socket ?? throw new ArgumentNullException(nameof(socket));
             this.serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
 
 
             // Add watch for incoming messages 
-            this.socket.DataReceived += HandleIncomingMessage;
+            this.Socket.DataReceived += HandleIncomingMessage;
+            this.Socket.ReConnected += Socket_ReConnected;
         }
 
         /// <summary>
@@ -128,7 +129,36 @@ namespace Kraken.WebSockets
         public async Task ConnectAsync()
         {
             logger.LogDebug("Connect to the websocket");
-            await socket.ConnectAsync();
+            await Socket.ConnectAsync();
+        }
+
+        private void Socket_ReConnected(object sender, EventArgs e)
+        {
+            logger.LogInformation("Re-connected!");
+            //collect subscriptions
+            var toSubscribe = new Dictionary<string, List<string>>();
+            lock (Subscriptions)
+            {
+                foreach (var sub in Subscriptions.Values)
+                {
+                    List<string> subs;
+                    if (!toSubscribe.TryGetValue(sub.Subscription.Name, out subs))
+                        toSubscribe[sub.Subscription.Name] = subs = new List<string>();
+
+                    subs.Add(sub.Pair);
+                }
+                Subscriptions.Clear();
+            }
+            //re-subscribe
+            Task.Run(async () =>
+            {
+                logger.LogInformation("Re-subscribing..");
+                foreach (var entry in toSubscribe)
+                {
+                    await SubscribeAsyncInternal(new Subscribe(entry.Value, new SubscribeOptions(entry.Key)));
+                    await Task.Delay(250);
+                }
+            });
         }
 
         /// <summary>
@@ -151,7 +181,7 @@ namespace Kraken.WebSockets
         private async Task SubscribeAsyncInternal(Subscribe subscribe)
         {
             logger.LogTrace("Adding subscription: {subscribe}", subscribe);
-            await socket.SendAsync(subscribe);
+            await Socket.SendAsync(subscribe);
         }
 
         /// <summary>
@@ -173,7 +203,7 @@ namespace Kraken.WebSockets
         private async Task UnsubscribeAsyncInternal(int channelId)
         {
             logger.LogTrace("Unsubscribe from subscription with channelId '{channelId}'", channelId);
-            await socket.SendAsync(new Unsubscribe(channelId));
+            await Socket.SendAsync(new Unsubscribe(channelId));
         }
 
         /// <summary>
@@ -195,7 +225,7 @@ namespace Kraken.WebSockets
         private async Task AddOrderInternal(AddOrderCommand addOrderCommand)
         {
             logger.LogTrace("Adding new order:{@addOrderCommand}", addOrderCommand);
-            await socket.SendAsync(addOrderCommand);
+            await Socket.SendAsync(addOrderCommand);
         }
 
         /// <summary>
@@ -218,7 +248,7 @@ namespace Kraken.WebSockets
         private async Task CancelOrderInternal(CancelOrderCommand cancelOrder)
         {
             logger.LogTrace("Cancelling existing order: {@cancelOrder}", cancelOrder);
-            await socket.SendAsync(cancelOrder);
+            await Socket.SendAsync(cancelOrder);
         }
 
         #region IDisposable Support
@@ -237,7 +267,7 @@ namespace Kraken.WebSockets
                         }
                     }
 
-                    socket.CloseAsync().GetAwaiter().GetResult();
+                    Socket.CloseAsync().GetAwaiter().GetResult();
                 }
 
                 disposedValue = true;
@@ -287,7 +317,9 @@ namespace Kraken.WebSockets
                     break;
 
                 case "data":
-                    var subscription = Subscriptions.ContainsKey(eventArgs.ChannelId.Value) ? Subscriptions[eventArgs.ChannelId.Value] : null;
+                    SubscriptionStatus subscription;
+                    lock (Subscriptions)
+                        subscription = Subscriptions.ContainsKey(eventArgs.ChannelId.Value) ? Subscriptions[eventArgs.ChannelId.Value] : null;
                     if (subscription == null)
                     {
                         logger.LogWarning("Didn't find a subscription for channelId {channelId}", eventArgs.ChannelId);
@@ -378,33 +410,36 @@ namespace Kraken.WebSockets
 
         private void SynchronizeSubscriptions(SubscriptionStatus currentStatus)
         {
-            if (currentStatus.ChannelId == null || !currentStatus.ChannelId.HasValue)
+            lock (Subscriptions)
             {
-                logger.LogWarning("SubscriptionStatus has no channelID");
-                // no channelID --> error?
-                return;
-            }
+                if (currentStatus.ChannelId == null || !currentStatus.ChannelId.HasValue)
+                {
+                    logger.LogWarning("SubscriptionStatus has no channelID");
+                    // no channelID --> error?
+                    return;
+                }
 
-            // handle unsubscribe
-            var channelIdValue = currentStatus.ChannelId.Value;
-            if (currentStatus.Status == "unsubscribed")
-            {
-                if (!Subscriptions.ContainsKey(channelIdValue)) return;
+                // handle unsubscribe
+                var channelIdValue = currentStatus.ChannelId.Value;
+                if (currentStatus.Status == "unsubscribed")
+                {
+                    if (!Subscriptions.ContainsKey(channelIdValue)) return;
 
-                Subscriptions.Remove(channelIdValue);
-                logger.LogDebug("Subscription for {channelID} successfully removed", channelIdValue);
-                return;
-            }
+                    Subscriptions.Remove(channelIdValue);
+                    logger.LogDebug("Subscription for {channelID} successfully removed", channelIdValue);
+                    return;
+                }
 
-            // handle subscription
-            var value = channelIdValue;
-            if (Subscriptions.ContainsKey(value))
-            {
-                Subscriptions[value] = currentStatus;
-            }
-            else
-            {
-                Subscriptions.Add(value, currentStatus);
+                // handle subscription
+                var value = channelIdValue;
+                if (Subscriptions.ContainsKey(value))
+                {
+                    Subscriptions[value] = currentStatus;
+                }
+                else
+                {
+                    Subscriptions.Add(value, currentStatus);
+                }
             }
         }
 
