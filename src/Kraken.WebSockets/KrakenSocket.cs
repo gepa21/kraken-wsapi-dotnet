@@ -180,6 +180,7 @@ namespace Kraken.WebSockets
                 try
                 {
                     await ConnectAsync();
+                    await Task.Delay(1 * 1000);
                     var ev = ReConnected;
                     if (ev != null)
                         InvokeAllHandlers(ev.GetInvocationList(), null);
