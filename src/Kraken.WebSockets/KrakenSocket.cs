@@ -170,7 +170,7 @@ namespace Kraken.WebSockets
                 logger?.LogInformation("Closing WebSocket");
                 webSocket.Dispose();
             }
-
+#if false
             //reconnect
             while (true)
             {
@@ -193,6 +193,7 @@ namespace Kraken.WebSockets
                 }
                 await Task.Delay(10 * 1000);
             }
+#endif
         }
 
         private async Task<string> ReadNextMessage(CancellationToken cancellationToken = default)
