@@ -101,8 +101,8 @@ namespace Kraken.WebSockets
                 return;
             }
 
-            logger?.LogWarning("WebSocket is not open. Current state: {state}",
-                webSocket.State);
+            throw new Exception($"WebSocket is not open. Current state: {webSocket.State}");
+            logger?.LogWarning("WebSocket is not open. Current state: {state}", webSocket.State);
         }
 
         /// <summary>
