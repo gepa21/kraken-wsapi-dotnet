@@ -20,17 +20,20 @@ namespace Kraken.WebSockets.Messages
         /// <returns></returns>
         internal static OrderDescription CreateFromJObject(JObject orderDescriptionObject)
         {
-            return new OrderDescription
-            {
-                Pair = orderDescriptionObject.Value<string>("pair"),
-                Type = orderDescriptionObject.Value<string>("type"),
-                OrderType = orderDescriptionObject.Value<string>("ordertype"),
-                Price = orderDescriptionObject.Value<decimal?>("price"),
-                SecondPrice = orderDescriptionObject.Value<decimal?>("price2"),
-                Leverage = orderDescriptionObject.Value<string>("leverage"),
-                Order = orderDescriptionObject.Value<string>("order"),
-                Close = orderDescriptionObject.Value<string>("close"),
-            };
+            if (orderDescriptionObject == null)
+                return null;
+            else
+                return new OrderDescription
+                {
+                    Pair = orderDescriptionObject.Value<string>("pair"),
+                    Type = orderDescriptionObject.Value<string>("type"),
+                    OrderType = orderDescriptionObject.Value<string>("ordertype"),
+                    Price = orderDescriptionObject.Value<decimal?>("price"),
+                    SecondPrice = orderDescriptionObject.Value<decimal?>("price2"),
+                    Leverage = orderDescriptionObject.Value<string>("leverage"),
+                    Order = orderDescriptionObject.Value<string>("order"),
+                    Close = orderDescriptionObject.Value<string>("close"),
+                };
         }
 
         /// <summary>
