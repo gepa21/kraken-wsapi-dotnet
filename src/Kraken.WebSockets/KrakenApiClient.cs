@@ -153,11 +153,15 @@ namespace Kraken.WebSockets
             Task.Run(async () =>
             {
                 logger.LogInformation("Re-subscribing..");
-                foreach (var entry in toSubscribe)
+                try
                 {
-                    await SubscribeAsyncInternal(new Subscribe(entry.Value, new SubscribeOptions(entry.Key)));
-                    await Task.Delay(250);
+                    foreach (var entry in toSubscribe)
+                    {
+                        await SubscribeAsyncInternal(new Subscribe(entry.Value, new SubscribeOptions(entry.Key)));
+                        await Task.Delay(250);
+                    }
                 }
+                catch (Exception ex) { logger.LogError(ex, "Failed to re-subscribe to pair"); }
             });
         }
 

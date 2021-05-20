@@ -101,8 +101,8 @@ namespace Kraken.WebSockets
                 return;
             }
 
-            logger?.LogWarning("WebSocket is not open. Current state: {state}",
-                webSocket.State);
+            throw new Exception($"WebSocket is not open. Current state: {webSocket.State}");
+            logger?.LogWarning("WebSocket is not open. Current state: {state}", webSocket.State);
         }
 
         /// <summary>
@@ -170,7 +170,7 @@ namespace Kraken.WebSockets
                 logger?.LogInformation("Closing WebSocket");
                 webSocket.Dispose();
             }
-
+#if false
             //reconnect
             while (true)
             {
@@ -180,6 +180,7 @@ namespace Kraken.WebSockets
                 try
                 {
                     await ConnectAsync();
+                    await Task.Delay(1 * 1000);
                     var ev = ReConnected;
                     if (ev != null)
                         InvokeAllHandlers(ev.GetInvocationList(), null);
@@ -192,6 +193,7 @@ namespace Kraken.WebSockets
                 }
                 await Task.Delay(10 * 1000);
             }
+#endif
         }
 
         private async Task<string> ReadNextMessage(CancellationToken cancellationToken = default)
